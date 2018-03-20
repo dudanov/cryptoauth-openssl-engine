@@ -38,6 +38,7 @@
 
 
 #include <openssl/engine.h>
+#include <limits.h>
 #include "eccx08_engine.h"
 #include "eccx08_engine_internal.h"
 

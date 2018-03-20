@@ -42,6 +42,11 @@
 #if ATCA_OPENSSL_OLD_API
 static ECDSA_METHOD * eccx08_ecdsa_default;
 static ECDSA_METHOD * eccx08_ecdsa;
+
+ECDSA_METHOD *eccx08_method(void)
+{
+        return eccx08_ecdsa;
+}
 #endif
 
 /**

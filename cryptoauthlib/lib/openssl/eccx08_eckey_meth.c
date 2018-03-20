@@ -184,7 +184,14 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, char* key_id)
             BN_free(bn);
             break;
         }
-        
+
+        /* Set method information */
+        if (!ECDSA_set_method(eckey, eccx08_method()))
+        {
+            DEBUG_ENGINE("Failed to set ECDSA methodes to key\n");
+            break;
+        }
+
         ret = ENGINE_OPENSSL_SUCCESS;
     } while (0);
 
