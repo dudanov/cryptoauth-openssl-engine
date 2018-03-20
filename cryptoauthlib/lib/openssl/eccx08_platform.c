@@ -47,8 +47,8 @@ ATCAIfaceCfg* eccx08_get_iface_default(ATCAIfaceType iType)
 {
     switch (iType)
     {
-    //case ATCA_I2C_IFACE:
-    //    return &cfg_ateccx08a_i2c_default;
+    case ATCA_I2C_IFACE:
+        return &cfg_ateccx08a_i2c_default;
     //case ATCA_SWI_IFACE:
     //    return &cfg_ateccx08a_swi_default;
     case ATCA_UART_IFACE:
