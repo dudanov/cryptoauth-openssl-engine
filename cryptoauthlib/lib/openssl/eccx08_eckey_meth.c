@@ -406,7 +406,6 @@ static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, char* k
 {
     ATCA_STATUS     status = ATCA_GEN_FAIL;
     EC_KEY *        eckey = NULL;
-    ATCAIfaceCfg    ifacecfg;
 
     DEBUG_ENGINE("Entered\n");
     if (!pkey)
@@ -423,6 +422,7 @@ static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, char* k
     {
         uint8_t raw_pubkey[ATCA_BLOCK_SIZE * 2 + 1];
         eccx08_engine_key_t  key_cfg;
+        uint8_t slot_num = 255;
 
         eckey = EVP_PKEY_get1_EC_KEY(pkey);
 
@@ -432,31 +432,19 @@ static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, char* k
             break;
         }
 
-        if (!BN_bn2bin(EC_KEY_get0_private_key(eckey), (uint8_t*)&key_cfg))
-        {
-            DEBUG_ENGINE("Failed\n");
-            break;
-        }
-
         /* Openssl raw key has a leading byte with conversion form id */
         raw_pubkey[0] = POINT_CONVERSION_UNCOMPRESSED;
 
-        /* Load the interface settings */
-        if (!eccx08_get_iface_cfg(&ifacecfg, &key_cfg))
-        {
-            DEBUG_ENGINE("Failed\n");
-            break;
-        }
-
-        /* Grab the device */
-        status = atcab_init_safe(&ifacecfg);
+        /* get device */
+        status = atcab_init_from_privkey_safe(eckey, &slot_num);
         if (status != ATCA_SUCCESS) {
-            DEBUG_ENGINE("Result %d\n", status);
+            DEBUG_ENGINE("ATECC init failed\n");
             break;
         }
+        DEBUG_ENGINE("Got ATECC\n");
 
         /* Get public key without private key generation */
-        status = atcab_get_pubkey(key_cfg.slot_num, &raw_pubkey[1]);
+        status = atcab_get_pubkey(slot_num, &raw_pubkey[1]);
         if (status != ATCA_SUCCESS) {
             DEBUG_ENGINE("Result %d\n", status);
         }

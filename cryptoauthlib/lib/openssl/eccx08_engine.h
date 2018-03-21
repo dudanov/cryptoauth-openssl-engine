@@ -150,7 +150,5 @@ cryptoauthlib at a later date so named accordingly */
 ATCA_STATUS atcab_init_safe(ATCAIfaceCfg *cfg);
 ATCA_STATUS atcab_release_safe(void);
 
-ECDSA_METHOD *eccx08_method(void);
-
 #endif /* __ECCX08_ENGINE_H__ */
 

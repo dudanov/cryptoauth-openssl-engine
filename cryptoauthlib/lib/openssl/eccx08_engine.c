@@ -127,6 +127,62 @@ ATCA_STATUS atcab_release_safe(void)
     return status;
 }
 
+/** \brief Run atcab_init_safe from keyinfo structure */
+ATCA_STATUS atcab_init_from_privkey_safe(const EC_KEY *key, uint8_t *slot_num)
+{
+    ATCA_STATUS status = ATCA_FUNC_FAIL;
+    ATCAIfaceCfg ifacecfg;
+    union {
+        eccx08_engine_key_t *keyinfo;
+        unsigned char *bnbuffer;
+    } u;
+    u.bnbuffer = NULL;
+
+    do {
+        const BIGNUM* bn = EC_KEY_get0_private_key(key);
+        if (!bn)
+        {
+            DEBUG_ENGINE("failed to get private part of EC key\n");
+            break;
+        }
+
+        u.bnbuffer = (unsigned char *) malloc(BN_num_bytes(bn));
+
+        if (!u.bnbuffer) {
+            DEBUG_ENGINE("failed to allocate space for private key\n");
+            return status;
+        }
+
+        if (!BN_bn2bin(bn, u.bnbuffer))
+        {
+            DEBUG_ENGINE("can't convert BN to key info\n");
+            break;
+        }
+
+        if (!eccx08_get_iface_cfg(&ifacecfg, u.keyinfo))
+        {
+            DEBUG_ENGINE("failed to get ifacecfg from keyinfo\n");
+            break;
+        }
+
+        status = atcab_init_safe(&ifacecfg);
+        if (status != ATCA_SUCCESS)
+        {
+            DEBUG_ENGINE("atcab_init_safe failed with result 0x%02x\n", status);
+            break;
+        }
+
+        *slot_num = u.keyinfo->slot_num;
+
+    } while (0);
+
+    if (u.bnbuffer) {
+         free(u.bnbuffer);
+    }
+
+    return status;
+}
+
 /**
 *  \brief Deinitialize the engine.
 *

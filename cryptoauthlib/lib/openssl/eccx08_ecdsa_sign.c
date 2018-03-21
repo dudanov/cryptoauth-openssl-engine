@@ -78,6 +78,7 @@ ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
     ATCA_STATUS status = ATCA_GEN_FAIL;
     uint8_t     raw_sig[ATCA_BLOCK_SIZE * 2];
     ECDSA_SIG * sig;
+    uint8_t slot_num = 255;
 
     DEBUG_ENGINE("Entered\n");
 
@@ -94,18 +95,26 @@ ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
         return NULL;
     }
 
+    if (eccx08_eckey_isx08key(eckey) != ENGINE_OPENSSL_SUCCESS)
+    {
+        DEBUG_ENGINE("bad ATECC ECDSA key object\n");
+        return NULL;
+    }
+
     do
     {
-        /* Get the device */
-        status = atcab_init_safe(pCfg);
-        if (ATCA_SUCCESS != status)
-        {
-            DEBUG_ENGINE("Init Failure: %#x\n", status);
+        /* get device */
+        status = atcab_init_from_privkey_safe(eckey, &slot_num);
+        if (status != ATCA_SUCCESS) {
+            DEBUG_ENGINE("ATECC init failed\n");
             break;
         }
+        DEBUG_ENGINE("Got ATECC\n");
 
         /* Do the actual signature using the configured slot */
-        status = atcab_sign(eccx08_engine_config.device_key_slot, dgst, raw_sig);
+        DEBUG_ENGINE("atcab_sign(slot %d, data:\n", eccx08_engine_config.device_key_slot);
+
+        status = atcab_sign(slot_num, dgst, raw_sig);
 
         /* Make sure we release the device before checking if the sign succeeded */
         if (ATCA_SUCCESS != atcab_release_safe())

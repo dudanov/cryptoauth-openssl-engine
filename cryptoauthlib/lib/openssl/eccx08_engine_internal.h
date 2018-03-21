@@ -223,8 +223,10 @@ int eccx08_pkey_isx08key(EVP_PKEY * pkey);
 ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
     const BIGNUM *inv, const BIGNUM *rp, EC_KEY *eckey);
 
+ECDSA_METHOD *eccx08_method(void);
 
-
+/* Helper to initialize ATECC device from key info */
+ATCA_STATUS atcab_init_from_privkey_safe(const EC_KEY *key, uint8_t *slot_num);
 
 
 #endif /* __ECCX08_ENGINE_INTERNAL_H__ */
