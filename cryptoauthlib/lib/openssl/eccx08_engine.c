@@ -50,7 +50,7 @@ eccx08_engine_config_t eccx08_engine_config;
 struct {
     void* handle;
     int state;
-} global_lock;
+} global_lock = { NULL, 0 };
 
 /** \brief Lock the global mutex */
 ATCA_STATUS eccx08_global_lock(void)

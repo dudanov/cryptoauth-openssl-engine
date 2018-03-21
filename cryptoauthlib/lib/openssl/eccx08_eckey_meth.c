@@ -128,9 +128,9 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, char* key_id)
 
     do
     {
-        EC_GROUP *  group = NULL;
+        const EC_GROUP *  group = NULL;
         eccx08_engine_key_t  key_info;
-        
+
         if (key_id)
         {
             if (!eccx08_eckey_string_to_struct(&key_info, key_id))
