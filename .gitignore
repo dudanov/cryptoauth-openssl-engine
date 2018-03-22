@@ -13,6 +13,8 @@ tmp/
 local.properties
 .settings/
 .loadpath
+.build
+openssl
 
 *.[0-9]
 *.o
