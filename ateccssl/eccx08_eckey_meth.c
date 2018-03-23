@@ -39,8 +39,6 @@
 #include "eccx08_engine.h"
 #include "eccx08_engine_internal.h"
 
-#include "../../hexdump.inc" // FIXME
-
 /* Additional OpenSSL Headers */
 #include <openssl/evp.h>
 
@@ -457,19 +455,19 @@ static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, const c
         /* Get public key without private key generation */
         status = atcab_get_pubkey(slot_num, &raw_pubkey[1]);
         if (status != ATCA_SUCCESS) {
-            DEBUG_ENGINE("Result %d\n", status);
+            DEBUG_ENGINE("Result 0x%x\n", status);
         }
 
         /* Release the device before testing status */
         if (ATCA_SUCCESS != atcab_release_safe()) {
-            DEBUG_ENGINE("Result %d\n", status);
+            DEBUG_ENGINE("Result 0x%x\n", status);
             break;
         }
 
         /* Check atcab_get_pubkey result */
         if (ATCA_SUCCESS != status)
         {
-            DEBUG_ENGINE("Result %d\n", status);
+            DEBUG_ENGINE("Result 0x%x\n", status);
             break;
         }
 

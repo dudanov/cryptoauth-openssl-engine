@@ -40,8 +40,6 @@
 
 #include <openssl/evp.h>
 
-#include "../../hexdump.inc"
-
 #if ATCA_OPENSSL_OLD_API
 static ECDSA_METHOD * eccx08_ecdsa_default;
 static ECDSA_METHOD * eccx08_ecdsa;
@@ -114,13 +112,8 @@ ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
         }
         DEBUG_ENGINE("Got ATECC\n");
 
-        DEBUG_ENGINE("Digest:\n");
-        hexdump(dgst, dgst_len);
-
         /* Do the actual signature using the configured slot */
-        DEBUG_ENGINE("Slot number %hhu\n", slot_num);
         status = atcab_sign(slot_num, dgst, raw_sig);
-
 
         /* Make sure we release the device before checking if the sign succeeded */
         if (ATCA_SUCCESS != atcab_release_safe())
@@ -134,9 +127,6 @@ ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
             DEBUG_ENGINE("Sign Failure: %#x\n", status);
             break;
         }
-
-        DEBUG_ENGINE("Raw signature:\n");
-        hexdump(raw_sig, 64);
 
         sig->r = BN_bin2bn(raw_sig, ATCA_BLOCK_SIZE, NULL);
         sig->s = BN_bin2bn(&raw_sig[ATCA_BLOCK_SIZE], ATCA_BLOCK_SIZE, NULL);
@@ -286,7 +276,6 @@ ECDSA_SIG* eccx08_ecdsa_sign(const unsigned char *dgst, int dgst_len,
     const BIGNUM *inv, const BIGNUM *rp,
     EC_KEY *eckey)
 {
-        DEBUG_ENGINE("Entered############################################################\n");
     /* Check if the provided key is a hardware key */
     if (eccx08_eckey_isx08key(eckey))
     {
@@ -318,8 +307,6 @@ int eccx08_ecdsa_init(ECDSA_METHOD ** ppMethod)
     {
         return ENGINE_OPENSSL_FAILURE;
     }
-
-    DEBUG_ENGINE("Register ECDSA SIGN method ##########################\n");
 
     ECDSA_METHOD_set_name(eccx08_ecdsa, "ATECCX08 ECDSA METHOD");
     ECDSA_METHOD_set_sign(eccx08_ecdsa, eccx08_ecdsa_sign);

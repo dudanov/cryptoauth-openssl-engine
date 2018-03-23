@@ -57,9 +57,6 @@ struct {
 /** \brief Lock the global mutex */
 ATCA_STATUS eccx08_global_lock(void)
 {
-        return ATCA_SUCCESS; // FIXME
-
-        DEBUG_ENGINE("Entered\n");
     ATCA_STATUS status = ATCA_SUCCESS;
     if (!global_lock.handle)
     {
@@ -361,7 +358,6 @@ static int bind_helper(ENGINE *e, const char *id)
 #if ATCA_OPENSSL_OLD_API && ATCA_OPENSSL_ENGINE_ECDSA
         /* Use the 1.0.2x Defined API for ECDSA */
         {
-                DEBUG_ENGINE("ECDSA sign API binding\n");
             ECDSA_METHOD * ecdsa_meth_ptr = NULL;
             if (!eccx08_ecdsa_init(&ecdsa_meth_ptr))
                 break;
