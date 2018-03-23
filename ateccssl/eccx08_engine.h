@@ -71,7 +71,7 @@ security implications */
 
 /** \brief Advertize certificate capabilities to OpenSSL (client certificate) */
 #ifndef ATCA_OPENSSL_ENGINE_ENABLE_CERTS
-#define ATCA_OPENSSL_ENGINE_ENABLE_CERTS        (1)
+#define ATCA_OPENSSL_ENGINE_ENABLE_CERTS        (0)
 #endif
 
 /** \brief Advertize ECDH capabilities to OpenSSL */
