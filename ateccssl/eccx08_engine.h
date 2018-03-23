@@ -139,10 +139,11 @@ typedef struct
 int eccx08_cmd_ctrl(ENGINE *e, int cmd, long i, void *p, void(*f)(void));
 
 #ifdef ECC_DEBUG
+#include <stdio.h>
 char * eccx08_strip_path(char * in_str);
 #define DEBUG_ENGINE(f, ...)    fprintf(stderr, "$$%s:%d:%s(): " f, eccx08_strip_path(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__)
 #else
-#define DEBUG_ENGINE(...)   asm("nop")
+#define DEBUG_ENGINE(...)  /* asm ("nop")*/
 #endif
 
 /* Concurency Support - Native to OpenSSL engine today but may move to

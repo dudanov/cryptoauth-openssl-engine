@@ -340,6 +340,8 @@ int eccx08_ecdsa_cleanup()
     {
         ECDSA_METHOD_free(eccx08_ecdsa);
     }
+
+    return ENGINE_OPENSSL_SUCCESS;
 }
 
 #endif

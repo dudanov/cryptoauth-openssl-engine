@@ -92,7 +92,7 @@ int eccx08_eckey_init(eccx08_engine_key_t * cfg)
     }
 }
 
-int eccx08_eckey_string_to_struct(eccx08_engine_key_t * out, char* in)
+int eccx08_eckey_string_to_struct(eccx08_engine_key_t * out, const char* in)
 {
     if (!out || !in)
     {
@@ -101,7 +101,7 @@ int eccx08_eckey_string_to_struct(eccx08_engine_key_t * out, char* in)
 
     eccx08_eckey_init(out);
 
-    if (4 == sscanf(in, "ATECCx08:%02x:%02x:%02x:%02x", &out->bus_type,
+    if (4 == sscanf(in, "ATECCx08:%02hhx:%02hhx:%02hhx:%02hhx", &out->bus_type,
         &out->bus_num, &out->device_num, &out->slot_num))
     {
         return ENGINE_OPENSSL_SUCCESS;
@@ -113,7 +113,7 @@ int eccx08_eckey_string_to_struct(eccx08_engine_key_t * out, char* in)
 }
 
 /** \brief Allocate and initialize a new ECKEY  */
-static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, char* key_id)
+static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
 {
     int ret = ENGINE_OPENSSL_FAILURE;
     EVP_PKEY *  pkey;
@@ -378,10 +378,14 @@ static int eccx08_eckey_convert(EC_KEY *pEcKey, uint8_t *pPubKeyRaw, size_t pubk
         }
 
         /* Allocate a public key from the group - this trusts that if one was provided its correct */
-        point = EC_POINT_new(group);
+        const EC_GROUP *cgroup = EC_KEY_get0_group(pEcKey);
+        if (!cgroup) {
+            break;
+        }
+        point = EC_POINT_new(cgroup);
 
         /* Use the openssl octect to point conversion routine to convert the raw format */
-        if (EC_POINT_oct2point(group, point, pPubKeyRaw, pubkeylen, NULL))
+        if (EC_POINT_oct2point(cgroup, point, pPubKeyRaw, pubkeylen, NULL))
         {
             EC_KEY_set_public_key(pEcKey, point);
             rv = ENGINE_OPENSSL_SUCCESS;
@@ -410,7 +414,7 @@ static int eccx08_eckey_convert(EC_KEY *pEcKey, uint8_t *pPubKeyRaw, size_t pubk
  *       the callback data (not used by the ateccx08 engine)
  * \return EVP_PKEY for success, NULL otherwise
  */
-static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, char* key_id)
+static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, const char* key_id)
 {
     ATCA_STATUS     status = ATCA_GEN_FAIL;
     EC_KEY *        eckey = NULL;
@@ -429,7 +433,6 @@ static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, char* k
     do
     {
         uint8_t raw_pubkey[ATCA_BLOCK_SIZE * 2 + 1];
-        eccx08_engine_key_t  key_cfg;
         uint8_t slot_num = 255;
 
         eckey = EVP_PKEY_get1_EC_KEY(pkey);
@@ -746,13 +749,6 @@ static int eccx08_pkey_ec_sign(EVP_PKEY_CTX *ctx, unsigned char *sig,
     else
 #endif
     {
-        if (eccx08_pkey_def_f.sign) {
-                DEBUG_ENGINE("run preserved sign method\n");
-                return eccx08_pkey_def_f.sign(ctx, sig, siglen, tbs, tbslen);
-        } else {
-                DEBUG_ENGINE("giving up - WTF?\n");
-                return ENGINE_OPENSSL_SUCCESS;
-        }
         return eccx08_pkey_def_f.sign ?
             eccx08_pkey_def_f.sign(ctx, sig, siglen, tbs, tbslen)
             : ENGINE_OPENSSL_SUCCESS;
@@ -804,7 +800,7 @@ int eccx08_pmeth_selector(ENGINE *e, EVP_PKEY_METHOD **pkey_meth,
     DEBUG_ENGINE("Entered\n");
     if (!pkey_meth) {
         *nids = eccx08_pkey_meth_ids;
-        return 2;
+        return 1;
     }
 
     if (EVP_PKEY_EC == nid)
@@ -934,7 +930,7 @@ int eccx08_ecdsa_cleanup()
  */
 int eccx08_pkey_meth_init(void)
 {
-    static EVP_PKEY_METHOD * defaults;
+    static const EVP_PKEY_METHOD * defaults;
 
     DEBUG_ENGINE("Entered\n");
 
@@ -954,10 +950,10 @@ int eccx08_pkey_meth_init(void)
     EVP_PKEY_meth_copy(eccx08_pkey_meth, defaults);
 
     /* Retain default methods we'll be replacing */
-    EVP_PKEY_meth_get_init(defaults, &eccx08_pkey_def_f.init);
-    EVP_PKEY_meth_get_keygen(defaults, &eccx08_pkey_def_f.keygen_init, &eccx08_pkey_def_f.keygen);
-    EVP_PKEY_meth_get_sign(defaults, &eccx08_pkey_def_f.sign_init, &eccx08_pkey_def_f.sign);
-    EVP_PKEY_meth_get_derive(defaults, &eccx08_pkey_def_f.derive_init, &eccx08_pkey_def_f.derive);
+    EVP_PKEY_meth_get_init(eccx08_pkey_meth, &eccx08_pkey_def_f.init);
+    EVP_PKEY_meth_get_keygen(eccx08_pkey_meth, &eccx08_pkey_def_f.keygen_init, &eccx08_pkey_def_f.keygen);
+    EVP_PKEY_meth_get_sign(eccx08_pkey_meth, &eccx08_pkey_def_f.sign_init, &eccx08_pkey_def_f.sign);
+    EVP_PKEY_meth_get_derive(eccx08_pkey_meth, &eccx08_pkey_def_f.derive_init, &eccx08_pkey_def_f.derive);
 
     /* Replace those we need to intercept */
     EVP_PKEY_meth_set_init(eccx08_pkey_meth, eccx08_pkey_ec_init);

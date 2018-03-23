@@ -274,7 +274,7 @@ static ATCA_STATUS config_signer_cert(char* pStr)
 static int get_key(ENGINE* e, uint16_t keyid, char * filename)
 {
     ATCA_STATUS status = ATCA_GEN_FAIL;
-    char* key_str[32];
+    char key_str[32];
     EVP_PKEY* pkey;
     
     DEBUG_ENGINE("Entered\n");
@@ -415,7 +415,7 @@ int eccx08_cmd_ctrl(ENGINE *e, int cmd, long i, void *p, void (*f)(void))
             break;
 #endif
         default:
-            DEBUG_ENGINE("Unknown command: %d with i=%d, p=%s\n", cmd, i, p?p:"");
+            DEBUG_ENGINE("Unknown command: %d with i=%ld, p=%s\n", cmd, i, p?(const char *)p:"");
             break;
     }
 

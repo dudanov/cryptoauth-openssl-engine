@@ -183,6 +183,7 @@ int eccx08_cert_cleanup(void)
 
     eccx08_cert_free(g_cert_def_1_signer_ptr);
     eccx08_cert_free(g_cert_def_2_device_ptr);
+    eccx08_cert_free(g_cert_def_3_csr_ptr);
 
     return ENGINE_OPENSSL_SUCCESS;
 }

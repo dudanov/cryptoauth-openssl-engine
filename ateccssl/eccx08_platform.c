@@ -122,9 +122,9 @@ char * eccx08_strip_path(char * in_str)
     if (!in_str)
         return "";
 #ifdef _WIN32
-    while (tmp = strchr(tmp, '\\'))
+    while ((tmp = strchr(tmp, '\\')) != NULL)
 #else
-    while (tmp = strchr(tmp, '/'))
+    while ((tmp = strchr(tmp, '/')) != NULL)
 #endif
     {
         rv = ++tmp;

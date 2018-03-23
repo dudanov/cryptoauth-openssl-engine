@@ -403,7 +403,7 @@ static int bind_helper(ENGINE *e, const char *id)
     }
     else
     {
-        DEBUG_ENGINE("FAILED, Error: %d\n", ERR_peek_error());
+        DEBUG_ENGINE("FAILED, Error: %ld\n", ERR_peek_error());
     }
 
     return rv;
@@ -414,6 +414,7 @@ IMPLEMENT_DYNAMIC_CHECK_FN();
 IMPLEMENT_DYNAMIC_BIND_FN(bind_helper);
 #endif
 
+#ifndef ENGINE_DYNAMIC_SUPPORT
 /**
  * \brief An engine entry point. As this is only ever called
  * once, there's no need for locking (indeed - the lock will
@@ -438,10 +439,7 @@ static ENGINE* ENGINE_ateccx08(void)
 /**
  *  \brief Load ATECCx08 Engine
  */
-#ifdef ENGINE_DYNAMIC_SUPPORT
-static
-#endif
-void ENGINE_load_ateccx08(void)
+static void ENGINE_load_ateccx08(void)
 {
     DEBUG_ENGINE("Entered\n");
     /* Copied from eng_[openssl|dyn].c */
@@ -451,3 +449,4 @@ void ENGINE_load_ateccx08(void)
     ENGINE_free(toadd);
     ERR_clear_error();
 }
+#endif
