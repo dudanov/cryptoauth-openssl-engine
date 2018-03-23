@@ -254,7 +254,9 @@ static int eccx08_init(ENGINE *e)
 
     /* Perform basic library initialization */
     eccx08_platform_init();
+#if ATCA_OPENSSL_ENGINE_ENABLE_CERTS
     eccx08_cert_init();
+#endif
 #if ATCA_OPENSSL_ENGINE_ENABLE_RAND
     eccx08_rand_init();
 #endif
@@ -273,7 +275,9 @@ static int eccx08_finish(ENGINE *e)
 {
     DEBUG_ENGINE("Entered\n");
 
+#if ATCA_OPENSSL_ENGINE_ENABLE_CERTS
     eccx08_cert_cleanup();
+#endif
     eccx08_ecdsa_cleanup();
     eccx08_pkey_meth_cleanup();
 

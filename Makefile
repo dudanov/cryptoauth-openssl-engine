@@ -67,9 +67,42 @@ ARFLAGS = rcs
 CRYPTOAUTHLIB_DIR=./cryptoauthlib
 LIBATECCSSL_DIR=./ateccssl
 
+LIBATECCSSL_SOURCES :=  eccx08_cmd_defns.c \
+						eccx08_ecdsa_sign.c \
+						eccx08_eckey_meth.c \
+						eccx08_engine.c \
+						eccx08_platform.c
+
+ifneq (,$(findstring ATCA_OPENSSL_ENGINE_ENABLE_CERTS, $(OPTIONS)))
+LIBATECCSSL_SOURCES += eccx08_cert.c
+ifneq (,$(findstring ATCA_OPENSSL_ENGINE_STATIC_CONFIG, $(OPTIONS)))
+LIBATECCSSL_SOURCES +=  cert_def_1_signer.c \
+						cert_def_2_device.c \
+						cert_def_3_device_csr.c
+endif
+endif
+
+ifneq (,$(findstring ATCA_OPENSSL_ENGINE_ENABLE_CIPHERS, $(OPTIONS)))
+LIBATECCSSL_SOURCES += eccx08_cipher.c
+endif
+
+ifneq (,$(findstring ATCA_OPENSSL_ENGINE_REGISTER_ECDH, $(OPTIONS)))
+LIBATECCSSL_SOURCES += eccx08_ecdh.c
+endif
+
+ifneq (,$(findstring ATCA_OPENSSL_ENGINE_ENABLE_SHA256, $(OPTIONS)))
+LIBATECCSSL_SOURCES += eccx08_sha256.c
+endif
+
+ifneq (,$(findstring ATCA_OPENSSL_ENGINE_ENABLE_RAND, $(OPTIONS)))
+LIBATECCSSL_SOURCES += eccx08_rand.c
+endif
+
+LIBATECCSSL_SOURCES := $(addprefix $(LIBATECCSSL_DIR)/, $(LIBATECCSSL_SOURCES))
+
 # Wildcard all the sources and headers
 SOURCES := $(call FIND,$(CRYPTOAUTHLIB_DIR)/lib,*.c)
-SOURCES += $(call FIND,$(LIBATECCSSL_DIR),*.c)
+SOURCES += $(LIBATECCSSL_SOURCES)
 INCLUDE := $(dir $(call FIND, $(CRYPTOAUTHLIB_DIR)/lib, *.h))
 INCLUDE += $(dir $(call FIND, $(LIBATECCSSL_DIR), *.h))
 INCLUDE += openssl/include/
@@ -141,7 +174,7 @@ $(OUTDIR)/libcryptoauth.a: $(LIBCRYPTOAUTH_OBJECTS) | $(OUTDIR)
 
 $(OUTDIR)/libateccssl.so: $(LIBATECCSSL_OBJECTS) $(LIBCRYPTOAUTH_OBJECTS) | $(OUTDIR)
 	@echo " [LD] $@"
-	@$(LD) -dll -shared $(LIBATECCSSL_OBJECTS) $(LIBCRYPTOAUTH_OBJECTS) -o $@ -lcrypto -lrt
+	@$(LD) -shared $(LIBATECCSSL_OBJECTS) $(LIBCRYPTOAUTH_OBJECTS) -o $@ -lcrypto -lrt
 
 $(OUTDIR)/test: $(OUTDIR)/libateccssl.so $(TEST_OBJECTS) | $(OUTDIR)
 	@echo " [CC TEST] $@"
