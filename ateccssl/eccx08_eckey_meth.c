@@ -165,13 +165,19 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, char* key_id)
         group = EC_KEY_get0_group(eckey);
         if (group)
         {
-            EC_GROUP_set_point_conversion_form(group, POINT_CONVERSION_UNCOMPRESSED);
-            EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE);
+            /* EC_GROUP_set_point_conversion_form(group, POINT_CONVERSION_UNCOMPRESSED); */
+            /* EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE); */
         }
 
         /* Connect the basics */
         pkey->type = EVP_PKEY_EC;
+
+        if (!ENGINE_init(e))
+        {
+            break;
+        }
         pkey->engine = e;
+
         pkey->ameth = EVP_PKEY_asn1_find(&e, EVP_PKEY_EC);
 
         /* Convert the key info into a bignum */
