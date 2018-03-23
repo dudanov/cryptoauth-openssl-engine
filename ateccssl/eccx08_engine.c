@@ -123,7 +123,7 @@ ATCA_STATUS atcab_init_safe(ATCAIfaceCfg *cfg)
 
     memcpy(ifacecfg, cfg, sizeof (ATCAIfaceCfg));
 
-    return atcab_init(cfg);
+    return atcab_init(ifacecfg);
 }
 
 /** \brief Thin abstraction on atcab_release that incorporates a global locking mechanism*/
@@ -141,10 +141,10 @@ ATCA_STATUS atcab_release_safe(void)
         return ATCA_FUNC_FAIL;
     }
 
+    status = atcab_release();
+
     free(ifacecfg);
     ifacecfg = NULL;
-
-    status = atcab_release();
 
     (void)eccx08_global_unlock();
 
