@@ -128,7 +128,7 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
 
     do
     {
-        const EC_GROUP *  group = NULL;
+        EC_GROUP *  group = NULL;
         eccx08_engine_key_t  key_info;
 
         if (key_id)
@@ -160,12 +160,14 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
         }
 
         /* Assign the group info */
-        group = EC_KEY_get0_group(eckey);
+        group = EC_GROUP_dup(EC_KEY_get0_group(eckey));
         if (group)
         {
-            /* EC_GROUP_set_point_conversion_form(group, POINT_CONVERSION_UNCOMPRESSED); */
-            /* EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE); */
+            EC_GROUP_set_point_conversion_form(group, POINT_CONVERSION_UNCOMPRESSED);
+            EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE);
         }
+        EC_KEY_set_group(eckey, group);
+        EC_GROUP_free(group);
 
         /* Connect the basics */
         pkey->type = EVP_PKEY_EC;
@@ -325,7 +327,6 @@ void eccx08_pkey_ctx_debug(BIO * bio, EVP_PKEY_CTX *ctx)
 static int eccx08_eckey_convert(EC_KEY *pEcKey, uint8_t *pPubKeyRaw, size_t pubkeylen)
 {
     int         rv = ENGINE_OPENSSL_FAILURE;
-    EC_GROUP *  group = NULL;
     EC_POINT *  point = NULL;
 
     if (!pEcKey || !pPubKeyRaw)
@@ -343,26 +344,26 @@ static int eccx08_eckey_convert(EC_KEY *pEcKey, uint8_t *pPubKeyRaw, size_t pubk
     do
     {
         /* Get the group from the EC_KEY */
-        group = EC_KEY_get0_group(pEcKey);
+        const EC_GROUP *group = EC_KEY_get0_group(pEcKey);
 
         /* Check that the group is allocated and configured correctly */
         if (!group)
         {
-            group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
-            if (group)
+            EC_GROUP *newgroup = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
+            if (newgroup)
             {
-                EC_GROUP_set_point_conversion_form(group, POINT_CONVERSION_UNCOMPRESSED);
-                EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE);
+                EC_GROUP_set_point_conversion_form(newgroup, POINT_CONVERSION_UNCOMPRESSED);
+                EC_GROUP_set_asn1_flag(newgroup, OPENSSL_EC_NAMED_CURVE);
 
-                if (!EC_KEY_set_group(pEcKey, group))
+                if (!EC_KEY_set_group(pEcKey, newgroup))
                 {
                     break;
                 }
 
                 /* Since set_group makes a copy of it we have to free the temporary */
-                EC_GROUP_free(group);
+                EC_GROUP_free(newgroup);
 
-                /* Try to get the EC_KEY copy */
+                /* Read new group */
                 group = EC_KEY_get0_group(pEcKey);
                 if (!group)
                 {
@@ -376,14 +377,10 @@ static int eccx08_eckey_convert(EC_KEY *pEcKey, uint8_t *pPubKeyRaw, size_t pubk
         }
 
         /* Allocate a public key from the group - this trusts that if one was provided its correct */
-        const EC_GROUP *cgroup = EC_KEY_get0_group(pEcKey);
-        if (!cgroup) {
-            break;
-        }
-        point = EC_POINT_new(cgroup);
+        point = EC_POINT_new(group);
 
         /* Use the openssl octect to point conversion routine to convert the raw format */
-        if (EC_POINT_oct2point(cgroup, point, pPubKeyRaw, pubkeylen, NULL))
+        if (EC_POINT_oct2point(group, point, pPubKeyRaw, pubkeylen, NULL))
         {
             EC_KEY_set_public_key(pEcKey, point);
             rv = ENGINE_OPENSSL_SUCCESS;
