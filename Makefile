@@ -1,5 +1,9 @@
 .PHONY: all libcryptoauth libateccssl libpkcs11 dist install clean
 
+CC:=$(CROSS_COMPILE)gcc
+LD:=$(CROSS_COMPILE)gcc
+AR:=$(CROSS_COMPILE)ar
+
 OPTIONS := ATCAPRINTF ATCA_HAL_I2C ENGINE_DYNAMIC_SUPPORT USE_ECCX08 ATCA_OPENSSL_ENGINE_STATIC_CONFIG
 
 # SYSTEM_INCLUDES := /usr/include
@@ -40,7 +44,7 @@ endif
 CFLAGS := 
 
 ifeq ($(uname_S),Linux)
-CFLAGS += -g -O1 -m64 -Wall -fPIC $(addprefix -D,$(OPTIONS))
+CFLAGS += -g -O2 -Wall -fPIC $(addprefix -D,$(OPTIONS))
 TARGET_ARCH := Linux
 endif
 #    ifeq ($(uname_S),Darwin)
@@ -59,7 +63,7 @@ endif
 
 OPENSSLDIR = /usr/local/include/openssl
 
-OUTDIR := $(abspath .build)
+OUTDIR := $(abspath .$(CROSS_COMPILE)build)
 
 DEPFLAGS = -MT $@ -MMD -MP -MF $(OUTDIR)/$*.d
 ARFLAGS = rcs
