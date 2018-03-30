@@ -1,8 +1,14 @@
 .PHONY: all libcryptoauth libateccssl libpkcs11 dist install clean
 
+ifdef DEB_HOST_GNU_TYPE
+CROSS_COMPILE=$(DEB_HOST_GNU_TYPE)-
+endif
+
+ifdef CROSS_COMPILE
 CC:=$(CROSS_COMPILE)gcc
 LD:=$(CROSS_COMPILE)gcc
 AR:=$(CROSS_COMPILE)ar
+endif
 
 OPTIONS := ATCAPRINTF ATCA_HAL_I2C ENGINE_DYNAMIC_SUPPORT USE_ECCX08 ATCA_OPENSSL_ENGINE_STATIC_CONFIG
 
@@ -178,12 +184,16 @@ $(OUTDIR)/libcryptoauth.a: $(LIBCRYPTOAUTH_OBJECTS) | $(OUTDIR)
 
 $(OUTDIR)/libateccssl.so: $(LIBATECCSSL_OBJECTS) $(LIBCRYPTOAUTH_OBJECTS) | $(OUTDIR)
 	@echo " [LD] $@"
-	@$(LD) -shared $(LIBATECCSSL_OBJECTS) $(LIBCRYPTOAUTH_OBJECTS) -o $@ -l:libcrypto.so.1.0.0 -lrt
+	@$(CC) -shared $(LIBATECCSSL_OBJECTS) $(LIBCRYPTOAUTH_OBJECTS) -o $@ -l:libcrypto.so.1.0.0 -lrt
 
 $(OUTDIR)/test: $(OUTDIR)/libateccssl.so $(TEST_OBJECTS) | $(OUTDIR)
 	@echo " [CC TEST] $@"
 	@$(CC) -o $@ $(TEST_OBJECTS) -L$(OUTDIR) -lateccssl -lcrypto -lssl
 	
+install: $(OUTDIR)/libateccssl.so
+	mkdir -p $(DESTDIR)/usr/lib/$(DEB_HOST_GNU_TYPE)/openssl-1.0.0/engines/
+	install -m 0644 $(OUTDIR)/libateccssl.so $(DESTDIR)/usr/lib/$(DEB_HOST_GNU_TYPE)/openssl-1.0.0/engines/libateccx08.so
+
 include $(wildcard $(patsubst %,$(OUTDIR)/%.d,$(basename $(SOURCES))))
 
 libpkcs11: $(LIBPKCS11_OBJECTS) | $(OUTDIR)
@@ -198,4 +208,4 @@ test: $(OUTDIR)/test | $(OUTDIR)
 	env LD_LIBRARY_PATH=$(OUTDIR) $(OUTDIR)/test
 
 clean:
-	rm -r $(OUTDIR)
+	rm -rf .*-build
