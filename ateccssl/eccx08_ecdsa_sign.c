@@ -44,7 +44,7 @@
 static ECDSA_METHOD * eccx08_ecdsa_default;
 static ECDSA_METHOD * eccx08_ecdsa;
 
-ECDSA_METHOD *eccx08_method(void)
+ECDSA_METHOD *eccx08_ecdsa_method(void)
 {
         return eccx08_ecdsa;
 }
@@ -90,7 +90,7 @@ ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
         return NULL;
     }
 
-    sig = (ECDSA_SIG *)OPENSSL_malloc(sizeof(ECDSA_SIG));
+    sig = ECDSA_SIG_new();
     if (!sig)
     {
         return NULL;
@@ -128,8 +128,20 @@ ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
             break;
         }
 
-        sig->r = BN_bin2bn(raw_sig, ATCA_BLOCK_SIZE, NULL);
-        sig->s = BN_bin2bn(&raw_sig[ATCA_BLOCK_SIZE], ATCA_BLOCK_SIZE, NULL);
+        BIGNUM *r, *s;
+        r = BN_bin2bn(raw_sig, ATCA_BLOCK_SIZE, NULL);
+        s = BN_bin2bn(&raw_sig[ATCA_BLOCK_SIZE], ATCA_BLOCK_SIZE, NULL);
+#if ATCA_OPENSSL_OLD_API
+        sig->r = r;
+        sig->s = s;
+#else
+        if (!ECDSA_SIG_set0(sig, r, s))
+        {
+            DEBUG_ENGINE("Failed to set ECDSA signature values\n");
+            status = ATCA_FUNC_FAIL;
+            break;
+        }
+#endif
 
         DEBUG_ENGINE("Succeeded\n");
     } while (0);
@@ -176,6 +188,7 @@ static int eccx08_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx, BIGNUM **kinv,
  * \return 1 for success (signature is verified and no error is
  *         detected)
  */
+#if ATCA_OPENSSL_ENGINE_ENABLE_HW_VERIFY
 static int eccx08_ecdsa_do_verify(const unsigned char *dgst, int dgst_len,
                                   const ECDSA_SIG *sig, EC_KEY *eckey)
 {
@@ -187,6 +200,7 @@ static int eccx08_ecdsa_do_verify(const unsigned char *dgst, int dgst_len,
     const EC_GROUP *group;
     point_conversion_form_t form;
     bool verified = 0;
+    const BIGNUM *r, *s;
 
     DEBUG_ENGINE("Entered\n");
 
@@ -195,19 +209,26 @@ static int eccx08_ecdsa_do_verify(const unsigned char *dgst, int dgst_len,
         goto done;
     }
 
-    len = BN_num_bytes(sig->r);
+#if ATCA_OPENSSL_OLD_API
+    r = sig->r;
+    s = sig->s;
+#else
+    ECDSA_SIG_get0(sig, &r, &s);
+#endif
+
+    len = BN_num_bytes(r);
     if (len > sig_len / 2) {
         goto done;
     }
-    len = BN_num_bytes(sig->s);
+    len = BN_num_bytes(s);
     if (len > sig_len / 2) {
         goto done;
     }
-    len = BN_bn2bin(sig->r, raw_sig);
+    len = BN_bn2bin(r, raw_sig);
     if (len > sig_len / 2) {
         goto done;
     }
-    len = BN_bn2bin(sig->s, &raw_sig[sig_len / 2]);
+    len = BN_bn2bin(s, &raw_sig[sig_len / 2]);
     if (len > sig_len / 2) {
         goto done;
     }
@@ -271,6 +292,7 @@ done:
         return ENGINE_OPENSSL_FAILURE;
     }
 }
+#endif
 
 ECDSA_SIG* eccx08_ecdsa_sign(const unsigned char *dgst, int dgst_len,
     const BIGNUM *inv, const BIGNUM *rp,
@@ -284,7 +306,17 @@ ECDSA_SIG* eccx08_ecdsa_sign(const unsigned char *dgst, int dgst_len,
     else
     {
         /* Not a hardware key - compute normally */
+#if ATCA_OPENSSL_OLD_API
         return eccx08_ecdsa_default->ecdsa_do_sign(dgst, dgst_len, inv, rp, eckey);
+#else
+        const EC_KEY_METHOD *dflt = eccx08_ec_default_method();
+        /* TODO: get method pointer from there and call a function */
+        ECDSA_SIG *(*dflt_meth)(const unsigned char *, int, const BIGNUM *,
+                const BIGNUM *, EC_KEY *);
+
+        EC_KEY_METHOD_get_sign(dflt, NULL, NULL, &dflt_meth);
+        return dflt_meth(dgst, dgst_len, inv, rp, eckey);
+#endif
     }
 }
 
@@ -327,6 +359,26 @@ int eccx08_ecdsa_cleanup()
     {
         ECDSA_METHOD_free(eccx08_ecdsa);
     }
+
+    return ENGINE_OPENSSL_SUCCESS;
+}
+
+#else
+
+int eccx08_ecdsa_init_meth(EC_KEY_METHOD *pMethod)
+{
+    DEBUG_ENGINE("Entered\n");
+
+    if (!pMethod)
+    {
+        return ENGINE_OPENSSL_FAILURE;
+    }
+
+    EC_KEY_METHOD_set_sign(pMethod, NULL, NULL, eccx08_ecdsa_sign);
+
+#if ATCA_OPENSSL_ENGINE_ENABLE_HW_VERIFY
+    EC_KEY_METHOD_set_verify(pMethod, eccx08_ecdsa_do_verify);
+#endif
 
     return ENGINE_OPENSSL_SUCCESS;
 }

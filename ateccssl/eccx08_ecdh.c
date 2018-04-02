@@ -251,4 +251,20 @@ int eccx08_ecdh_cleanup(void)
     return ENGINE_OPENSSL_SUCCESS;
 }
 
+#else
+
+int ecxx08_ecdh_init_meth(EC_KEY_METHOD *pMethod)
+{
+    DEBUG_ENGINE("Entered\n");
+
+    if (!pMethod)
+    {
+        return ENGINE_OPENSSL_FAILURE;
+    }
+
+    EC_KEY_METHOD_set_compute_key(pMethod, eccx08_ecdh_compute_key);
+
+    return ENGINE_OPENSSL_SUCCESS;
+}
+
 #endif

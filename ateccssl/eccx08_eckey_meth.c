@@ -50,6 +50,44 @@
 #pragma message("Warning: DANGER! This prints key material to stdout - ONLY USE FOR DEBUGGING")
 #endif
 
+/* Here comes a dirty hack because OpenSSL guys implemented EVP_PKEY_set1_engine only in 1.1.0g,
+ * but Debian stretch has 1.1.0f */
+#if OPENSSL_VERSION < 0x1010007fL
+struct evp_pkey_st {
+    int type;
+    int save_type;
+    int references;
+    const EVP_PKEY_ASN1_METHOD *ameth;
+    ENGINE *engine;
+    ENGINE *pmeth_engine; /* If not NULL public key ENGINE to use */
+    union {
+        void *ptr;
+        struct ec_key_st *ec;   /* ECC */
+    } pkey;
+    int save_parameters;
+};
+typedef struct evp_pkey_st EVP_PKEY;
+
+int EVP_PKEY_set1_engine(EVP_PKEY *pkey, ENGINE *e)
+{
+    if (e != NULL) {
+        if (!ENGINE_init(e)) {
+            /* EVPerr(EVP_F_EVP_PKEY_SET1_ENGINE, ERR_R_ENGINE_LIB); */
+            return 0;
+        }
+        if (ENGINE_get_pkey_meth(e, pkey->type) == NULL) {
+            ENGINE_finish(e);
+            /* EVPerr(EVP_F_EVP_PKEY_SET1_ENGINE, EVP_R_UNSUPPORTED_ALGORITHM); */
+            return 0;
+        }
+    }
+    ENGINE_finish(pkey->pmeth_engine);
+    pkey->pmeth_engine = e;
+    return 1;
+}
+#endif
+
+
 static struct _eccx08_pkey_def_f {
     int(*init) (EVP_PKEY_CTX *ctx);
     int(*paramgen_init) (EVP_PKEY_CTX *ctx);
@@ -170,8 +208,16 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
         EC_GROUP_free(group);
 
         /* Connect the basics */
+#if ATCA_OPENSSL_OLD_API
         pkey->type = EVP_PKEY_EC;
+#else
+        if (!EVP_PKEY_set_type(pkey, EVP_PKEY_EC))
+        {
+            break;
+        }
+#endif
 
+#if ATCA_OPENSSL_OLD_API
         if (!ENGINE_init(e))
         {
             break;
@@ -179,6 +225,12 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
         pkey->engine = e;
 
         pkey->ameth = EVP_PKEY_asn1_find(&e, EVP_PKEY_EC);
+#else
+        if (!EVP_PKEY_set1_engine(pkey, e))
+        {
+            break;
+        }
+#endif
 
         /* Convert the key info into a bignum */
         if (NULL == (bn = BN_bin2bn((uint8_t*)&key_info, sizeof(key_info), NULL)))
@@ -194,7 +246,11 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
         }
 
         /* Set method information */
-        if (!ECDSA_set_method(eckey, eccx08_method()))
+#if ATCA_OPENSSL_OLD_API
+        if (!ECDSA_set_method(eckey, eccx08_ecdsa_method()))
+#else
+        if (!EC_KEY_set_method(eckey, eccx08_ec_method()))
+#endif
         {
             DEBUG_ENGINE("Failed to set ECDSA methodes to key\n");
             break;
@@ -225,14 +281,11 @@ int eccx08_eckey_isx08key(EC_KEY * ec)
     {
         uint8_t buf[32];
 
-        if (bn->dmax * sizeof(BN_ULONG) <= sizeof(buf))
+        if (BN_bn2binpad(bn, buf, sizeof (buf)))
         {
-            if (BN_bn2bin(bn, buf))
+            if (!memcmp(buf, "ATECCx08", 8))
             {
-                if (!memcmp(buf, "ATECCx08", 8))
-                {
-                    ret = ENGINE_OPENSSL_SUCCESS;
-                }
+                ret = ENGINE_OPENSSL_SUCCESS;
             }
         }
     }
@@ -537,7 +590,7 @@ int eccx08_pkey_ec_init(EVP_PKEY_CTX *ctx)
             /* Load the public key from the device - OpenSSL would have already
             checked the key against a cert if it was asked to use the cert so
             this may be redundant depending on the use */
-            if (!eccx08_load_pubkey_internal(ctx->engine,
+            if (!eccx08_load_pubkey_internal(eccx08_engine(),
                 EVP_PKEY_CTX_get0_pkey(ctx), NULL))
             {
                 return ENGINE_OPENSSL_FAILURE;
@@ -877,16 +930,36 @@ int eccx08_pmeth_selector(ENGINE *e, EVP_PKEY_METHOD **pkey_meth,
         }
     }
 }
-#else
+#endif
 
-static EC_METHOD * eccx08_ec;
 
-int eccx08_ec_init(EC_METHOD ** ppMethod)
+#if !ATCA_OPENSSL_OLD_API
+
+static EC_KEY_METHOD * eccx08_ec;
+static const EC_KEY_METHOD * eccx08_ec_default;
+
+const EC_KEY_METHOD *eccx08_ec_default_method(void)
+{
+    return eccx08_ec_default;
+}
+
+EC_KEY_METHOD *eccx08_ec_method(void)
+{
+    return eccx08_ec;
+}
+
+int eccx08_ec_init(EC_KEY_METHOD ** ppMethod)
 {
     DEBUG_ENGINE("Entered\n");
+
+    if (!eccx08_ec_default)
+    {
+        eccx08_ec_default = EC_KEY_get_default_method();
+    }
+
     if (!eccx08_ec)
     {
-        eccx08_ec = EC_METHOD_new(EC_get_default_method());
+        eccx08_ec = EC_KEY_METHOD_new(eccx08_ec_default);
     }
 
     if (!eccx08_ec || !ppMethod)
@@ -894,11 +967,22 @@ int eccx08_ec_init(EC_METHOD ** ppMethod)
         return ENGINE_OPENSSL_FAILURE;
     }
 
-    EC_METHOD_set_name(eccx08_ecdsa, "ATECCX08 METHODS");
-//    EC_METHOD_set_sign(eccx08_ecdsa, eccx08_ecdsa_do_sign);
+    /* EC_KEY_METHOD_set_name(eccx08_ec, "ATECCX08 method"); */
 
-#if ATCA_OPENSSL_ENGINE_ENABLE_HW_VERIFY
-//    ECDSA_METHOD_set_verify(eccx08_ecdsa, eccx08_ecdsa_do_verify);
+#if ATCA_OPENSSL_ENGINE_ECDH
+    if (!eccx08_ecdh_init_meth(eccx08_ec))
+    {
+        eccx08_ec_cleanup();
+        return ENGINE_OPENSSL_FAILURE;
+    }
+#endif
+
+#if ATCA_OPENSSL_ENGINE_ECDSA
+    if (!eccx08_ecdsa_init_meth(eccx08_ec))
+    {
+        eccx08_ec_cleanup();
+        return ENGINE_OPENSSL_FAILURE;
+    }
 #endif
 
     *ppMethod = eccx08_ec;
@@ -906,14 +990,16 @@ int eccx08_ec_init(EC_METHOD ** ppMethod)
     return ENGINE_OPENSSL_SUCCESS;
 }
 
-int eccx08_ecdsa_cleanup()
+int eccx08_ec_cleanup()
 {
     DEBUG_ENGINE("Entered\n");
     if (eccx08_ec)
     {
-        EC_METHOD_free(eccx08_ec);
+        EC_KEY_METHOD_free(eccx08_ec);
         eccx08_ec = NULL;
     }
+
+    return ENGINE_OPENSSL_SUCCESS;
 }
 
 #endif /* ATCA_OPENSSL_OLD_API */

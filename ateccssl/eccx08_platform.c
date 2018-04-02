@@ -117,7 +117,7 @@ int eccx08_platform_init(void)
 char * eccx08_strip_path(char * in_str)
 {
     char * tmp = in_str;
-    char * rv;
+    char * rv = NULL;
 
     if (!in_str)
         return "";

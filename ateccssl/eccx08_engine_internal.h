@@ -44,7 +44,8 @@
 #if OPENSSL_VERSION_NUMBER > 0x10002000 && OPENSSL_VERSION_NUMBER < 0x10003000
 #define ATCA_OPENSSL_OLD_API                    (1)
 #else
-#error "This module will not work with OpenSSL v1.1.x APIs yet"
+/* #error "This module will not work with OpenSSL v1.1.x APIs yet" */
+#warning "Using new OpenSSL 1.1.x API"
 #endif
 
 /** Additional Logic for Allowed Functions */
@@ -161,7 +162,7 @@ typedef struct _eccx08_engine_config
     /** ECDH key slot (or base slot if more than one is used) */
     uint8_t     ecdh_key_slot;
     /** 0 - ECDH disabled, 1 - Enabled, >1 Used for wear leveling on ATECC508A */
-    uint8_t     ecdh_key_count;     
+    uint8_t     ecdh_key_count;
 } eccx08_engine_config_t;
 extern eccx08_engine_config_t eccx08_engine_config;
 
@@ -190,16 +191,27 @@ void eccx08_pkey_ctx_debug(BIO * bio, EVP_PKEY_CTX *ctx);
 /* Library Module Initialization Functions */
 int eccx08_cert_init(void);
 int eccx08_cipher_init(void);
+
+#if ATCA_OPENSSL_OLD_API
 int eccx08_ecdh_init(ECDH_METHOD**);
 int eccx08_ecdsa_init(ECDSA_METHOD**);
+
+int eccx08_ecdsa_cleanup(void);
+int eccx08_pkey_meth_cleanup(void);
+#else
+int eccx08_ecdh_init_meth(EC_KEY_METHOD*);
+int eccx08_ecdsa_init_meth(EC_KEY_METHOD*);
+int eccx08_ec_init(EC_KEY_METHOD**);
+
+int eccx08_ec_cleanup(void);
+#endif
+
 int eccx08_pkey_meth_init(void);
 int eccx08_platform_init(void);
 int eccx08_rand_init(void);
 
 /* Library Module Cleanup Functions */
 int eccx08_cert_cleanup(void);
-int eccx08_ecdsa_cleanup(void);
-int eccx08_pkey_meth_cleanup(void);
 
 /* Certificate Manipulation */
 atcacert_def_t * eccx08_cert_new(size_t size, size_t elements);
@@ -223,11 +235,17 @@ int eccx08_pkey_isx08key(EVP_PKEY * pkey);
 ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
     const BIGNUM *inv, const BIGNUM *rp, EC_KEY *eckey);
 
-ECDSA_METHOD *eccx08_method(void);
+#if ATCA_OPENSSL_OLD_API
+ECDSA_METHOD *eccx08_ecdsa_method(void);
+#else
+EC_KEY_METHOD *eccx08_ec_method(void);
+const EC_KEY_METHOD *eccx08_ec_default_method(void);
+#endif
 
 /* Helper to initialize ATECC device from key info */
 ATCA_STATUS atcab_init_from_privkey_safe(const EC_KEY *key, uint8_t *slot_num);
 
+ENGINE *eccx08_engine(void);
 
 #endif /* __ECCX08_ENGINE_INTERNAL_H__ */
 

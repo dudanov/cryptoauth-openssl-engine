@@ -67,8 +67,6 @@ endif
 #        CCFLAGS += -D ARM
 #    endif
 
-OPENSSLDIR = /usr/local/include/openssl
-
 OUTDIR := $(abspath .$(CROSS_COMPILE)build)
 
 DEPFLAGS = -MT $@ -MMD -MP -MF $(OUTDIR)/$*.d
@@ -115,7 +113,6 @@ SOURCES := $(call FIND,$(CRYPTOAUTHLIB_DIR)/lib,*.c)
 SOURCES += $(LIBATECCSSL_SOURCES)
 INCLUDE := $(dir $(call FIND, $(CRYPTOAUTHLIB_DIR)/lib, *.h))
 INCLUDE += $(dir $(call FIND, $(LIBATECCSSL_DIR), *.h))
-INCLUDE += openssl/include/
 INCLUDE := $(sort $(INCLUDE))
 
 
@@ -184,7 +181,7 @@ $(OUTDIR)/libcryptoauth.a: $(LIBCRYPTOAUTH_OBJECTS) | $(OUTDIR)
 
 $(OUTDIR)/libateccssl.so: $(LIBATECCSSL_OBJECTS) $(LIBCRYPTOAUTH_OBJECTS) | $(OUTDIR)
 	@echo " [LD] $@"
-	@$(CC) -shared $(LIBATECCSSL_OBJECTS) $(LIBCRYPTOAUTH_OBJECTS) -o $@ -l:libcrypto.so.1.0.0 -lrt
+	@$(CC) -shared $(LIBATECCSSL_OBJECTS) $(LIBCRYPTOAUTH_OBJECTS) -o $@ -l:libcrypto.so.1.1 -lrt
 
 $(OUTDIR)/test: $(OUTDIR)/libateccssl.so $(TEST_OBJECTS) | $(OUTDIR)
 	@echo " [CC TEST] $@"
@@ -208,4 +205,4 @@ test: $(OUTDIR)/test | $(OUTDIR)
 	env LD_LIBRARY_PATH=$(OUTDIR) $(OUTDIR)/test
 
 clean:
-	rm -rf .*-build
+	rm -rf .*build

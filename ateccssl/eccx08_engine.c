@@ -45,6 +45,13 @@ static const char * const engine_eccx08_mutex_name = ECCX08_ENGINE_ID "_" ECCX08
 
 static ATCAIfaceCfg *ifacecfg = NULL;
 
+static ENGINE *this_engine = NULL;
+
+ENGINE *eccx08_engine(void)
+{
+    return this_engine;
+}
+
 /* Global Engine Configuration Structure */
 eccx08_engine_config_t eccx08_engine_config;
 
@@ -275,8 +282,13 @@ static int eccx08_finish(ENGINE *e)
 #if ATCA_OPENSSL_ENGINE_ENABLE_CERTS
     eccx08_cert_cleanup();
 #endif
+
+#if ATCA_OPENSSL_OLD_API
     eccx08_ecdsa_cleanup();
     eccx08_pkey_meth_cleanup();
+#else
+    eccx08_ec_cleanup();
+#endif
 
     return ENGINE_OPENSSL_SUCCESS;
 }
@@ -369,7 +381,7 @@ static int bind_helper(ENGINE *e, const char *id)
 #if !ATCA_OPENSSL_OLD_API && (ATCA_OPENSSL_ENGINE_ECDH || ATCA_OPENSSL_ENGINE_ECDSA)
         /* Use the 1.1.x Defined API for ECDSA and ECDH */
         {
-            EC_METHOD * ec_meth_ptr = NULL;
+            EC_KEY_METHOD * ec_meth_ptr = NULL;
             if (!eccx08_ec_init(&ec_meth_ptr))
                 break;
             if (!ENGINE_set_EC(e, ec_meth_ptr))
@@ -396,6 +408,7 @@ static int bind_helper(ENGINE *e, const char *id)
     if (rv)
     {
         DEBUG_ENGINE("Succeeded\n");
+        this_engine = e;
     }
     else
     {
