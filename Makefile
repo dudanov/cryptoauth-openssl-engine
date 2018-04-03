@@ -188,8 +188,8 @@ $(OUTDIR)/test: $(OUTDIR)/libateccssl.so $(TEST_OBJECTS) | $(OUTDIR)
 	@$(CC) -o $@ $(TEST_OBJECTS) -L$(OUTDIR) -lateccssl -lcrypto -lssl
 	
 install: $(OUTDIR)/libateccssl.so
-	mkdir -p $(DESTDIR)/usr/lib/$(DEB_HOST_GNU_TYPE)/openssl-1.0.0/engines/
-	install -m 0644 $(OUTDIR)/libateccssl.so $(DESTDIR)/usr/lib/$(DEB_HOST_GNU_TYPE)/openssl-1.0.0/engines/libateccx08.so
+	mkdir -p $(DESTDIR)/usr/lib/$(DEB_HOST_GNU_TYPE)/engines-1.1/
+	install -m 0644 $(OUTDIR)/libateccssl.so $(DESTDIR)/usr/lib/$(DEB_HOST_GNU_TYPE)/engines-1.1/ateccx08.so
 
 include $(wildcard $(patsubst %,$(OUTDIR)/%.d,$(basename $(SOURCES))))
 

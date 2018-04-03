@@ -3,10 +3,10 @@ Maintainer: Nikita Maslov <n.maslov@contactless.ru>
 Section: misc
 Priority: optional
 Standards-Version: 3.9.2
-Build-Depends: debhelper (>= 9), libssl-dev | libssl1.0-dev (>= 1.0.2), libssl-dev | libssl1.0-dev (<< 1.1.0)
+Build-Depends: debhelper (>= 9), libssl-dev (>= 1.1.0)
 
-Package: libateccssl
+Package: libateccssl1.1
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Multi-Arch: same
-Description: ATECC508A/608A engine for OpenSSL
+Description: ATECC508A/608A engine for OpenSSL 1.1.x
