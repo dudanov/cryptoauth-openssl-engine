@@ -184,10 +184,25 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
             }
         }
 
-        if (NULL == (eckey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1)))
+        /* allocate new EC key with our engine */
+        eckey = EC_KEY_new_method(e);
+        if (!eckey)
         {
             break;
         }
+
+        /* set group */
+        group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
+        if (!group)
+        {
+            break;
+        }
+
+        /* configure and assign group */
+        EC_GROUP_set_point_conversion_form(group, POINT_CONVERSION_UNCOMPRESSED);
+        EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE);
+        EC_KEY_set_group(eckey, group);
+        EC_GROUP_free(group);
 
         /* Note: After this point eckey is associated with pkey and will be
         freed when pkey is freed */
@@ -197,27 +212,11 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
             break;
         }
 
-        /* Assign the group info */
-        group = EC_GROUP_dup(EC_KEY_get0_group(eckey));
-        if (group)
-        {
-            EC_GROUP_set_point_conversion_form(group, POINT_CONVERSION_UNCOMPRESSED);
-            EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE);
-        }
-        EC_KEY_set_group(eckey, group);
-        EC_GROUP_free(group);
 
         /* Connect the basics */
 #if ATCA_OPENSSL_OLD_API
         pkey->type = EVP_PKEY_EC;
-#else
-        if (!EVP_PKEY_set_type(pkey, EVP_PKEY_EC))
-        {
-            break;
-        }
-#endif
 
-#if ATCA_OPENSSL_OLD_API
         if (!ENGINE_init(e))
         {
             break;
@@ -225,11 +224,6 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
         pkey->engine = e;
 
         pkey->ameth = EVP_PKEY_asn1_find(&e, EVP_PKEY_EC);
-#else
-        if (!EVP_PKEY_set1_engine(pkey, e))
-        {
-            break;
-        }
 #endif
 
         /* Convert the key info into a bignum */
@@ -604,6 +598,7 @@ int eccx08_pkey_ec_init(EVP_PKEY_CTX *ctx)
         : ENGINE_OPENSSL_SUCCESS;
 }
 
+#if ATCA_OPENSSL_OLD_API
 /** \brief Initialize the key generation method. A placeholder in our case */
 static int eccx08_eckey_paramgen_init(EVP_PKEY_CTX *ctx)
 {
@@ -625,6 +620,7 @@ static int eccx08_eckey_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY * pkey)
     return eccx08_pkey_def_f.paramgen ? eccx08_pkey_def_f.paramgen(ctx, pkey)
         : ENGINE_OPENSSL_SUCCESS;
 }
+#endif
 
 /** \brief Initialize the key generation method. A placeholder in our case */
 static int eccx08_pkey_ec_keygen_init(EVP_PKEY_CTX *ctx)

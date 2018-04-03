@@ -72,7 +72,11 @@ ECDSA_METHOD *eccx08_ecdsa_method(void)
  * \return a pointer to the ECDSA_SIG structure for success,
  *         NULL otherwise
  */
+#if ATCA_OPENSSL_OLD_API
 ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
+#else
+ECDSA_SIG* eccx08_ecdsa_do_sign_sig(const unsigned char *dgst, int dgst_len,
+#endif
                                        const BIGNUM *inv, const BIGNUM *rp,
                                        EC_KEY *eckey)
 {
@@ -172,6 +176,26 @@ static int eccx08_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx, BIGNUM **kinv,
     DEBUG_ENGINE("Entered\n");
     return ENGINE_OPENSSL_SUCCESS;
 }
+
+/**
+ * \brief Sign method returning blob with signature
+ */
+#if !ATCA_OPENSSL_OLD_API
+static int eccx08_ecdsa_sign(int type, const unsigned char *dgst, int dlen,
+                             unsigned char *sig, unsigned int *siglen,
+                             const BIGNUM *kinv, const BIGNUM *r, EC_KEY *eckey)
+{
+    ECDSA_SIG *s;
+    s = eccx08_ecdsa_do_sign_sig(dgst, dlen, kinv, r, eckey);
+    if (!s) {
+        *siglen = 0;
+        return 0;
+    }
+    *siglen = i2d_ECDSA_SIG(s, &sig);
+    ECDSA_SIG_free(s);
+    return 1;
+}
+#endif
 
 /**
  *
@@ -294,14 +318,22 @@ done:
 }
 #endif
 
+#if ATCA_OPENSSL_OLD_API
 ECDSA_SIG* eccx08_ecdsa_sign(const unsigned char *dgst, int dgst_len,
+#else
+ECDSA_SIG* eccx08_ecdsa_sign_sig(const unsigned char *dgst, int dgst_len,
+#endif
     const BIGNUM *inv, const BIGNUM *rp,
     EC_KEY *eckey)
 {
     /* Check if the provided key is a hardware key */
     if (eccx08_eckey_isx08key(eckey))
     {
+#if ATCA_OPENSSL_OLD_API
         return eccx08_ecdsa_do_sign(dgst, dgst_len, inv, rp, eckey);
+#else
+        return eccx08_ecdsa_do_sign_sig(dgst, dgst_len, inv, rp, eckey);
+#endif
     }
     else
     {
@@ -374,7 +406,7 @@ int eccx08_ecdsa_init_meth(EC_KEY_METHOD *pMethod)
         return ENGINE_OPENSSL_FAILURE;
     }
 
-    EC_KEY_METHOD_set_sign(pMethod, NULL, NULL, eccx08_ecdsa_sign);
+    EC_KEY_METHOD_set_sign(pMethod, eccx08_ecdsa_sign, eccx08_ecdsa_sign_setup, eccx08_ecdsa_sign_sig);
 
 #if ATCA_OPENSSL_ENGINE_ENABLE_HW_VERIFY
     EC_KEY_METHOD_set_verify(pMethod, eccx08_ecdsa_do_verify);
