@@ -39,6 +39,8 @@
 #include "eccx08_engine.h"
 #include "eccx08_engine_internal.h"
 
+#include <string.h>
+
 /* Additional OpenSSL Headers */
 #include <openssl/evp.h>
 
@@ -52,7 +54,7 @@
 
 /* Here comes a dirty hack because OpenSSL guys implemented EVP_PKEY_set1_engine only in 1.1.0g,
  * but Debian stretch has 1.1.0f */
-#if OPENSSL_VERSION < 0x1010007fL
+#if OPENSSL_VERSION >= 0x10100000 && OPENSSL_VERSION < 0x1010007fL
 struct evp_pkey_st {
     int type;
     int save_type;
@@ -185,7 +187,11 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
         }
 
         /* allocate new EC key with our engine */
+#if ATCA_OPENSSL_OLD_API
+        eckey = EC_KEY_new();
+#else
         eckey = EC_KEY_new_method(e);
+#endif
         if (!eckey)
         {
             break;
@@ -274,13 +280,25 @@ int eccx08_eckey_isx08key(EC_KEY * ec)
     if (bn)
     {
         uint8_t buf[32];
-
+        uint8_t buf_ok = 0;
+#if ATCA_OPENSSL_OLD_API
+        if (bn->dmax * sizeof(BN_ULONG) <= sizeof(buf))
+        {
+            if (BN_bn2bin(bn, buf))
+            {
+                buf_ok = 1;
+            }
+        }
+#else
         if (BN_bn2binpad(bn, buf, sizeof (buf)))
         {
-            if (!memcmp(buf, "ATECCx08", 8))
-            {
-                ret = ENGINE_OPENSSL_SUCCESS;
-            }
+            buf_ok = 1;
+        }
+#endif
+
+        if (buf_ok && !memcmp(buf, "ATECCx08", 8))
+        {
+            ret = ENGINE_OPENSSL_SUCCESS;
         }
     }
     return ret;
