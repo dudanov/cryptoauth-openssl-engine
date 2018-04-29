@@ -43,9 +43,6 @@
 /** \brief Define if we're using the 1.0 or 1.1 APIs */
 #if OPENSSL_VERSION_NUMBER > 0x10002000 && OPENSSL_VERSION_NUMBER < 0x10003000
 #define ATCA_OPENSSL_OLD_API                    (1)
-#else
-/* #error "This module will not work with OpenSSL v1.1.x APIs yet" */
-#warning "Using new OpenSSL 1.1.x API"
 #endif
 
 /** Additional Logic for Allowed Functions */
