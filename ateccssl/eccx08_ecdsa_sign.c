@@ -84,6 +84,7 @@ ECDSA_SIG* eccx08_ecdsa_do_sign_sig(const unsigned char *dgst, int dgst_len,
     uint8_t     raw_sig[ATCA_BLOCK_SIZE * 2];
     ECDSA_SIG * sig;
     uint8_t slot_num = 255;
+    uint8_t passwd_id = NOPASSWD_ID;
 
     DEBUG_ENGINE("Entered\n");
 
@@ -100,7 +101,7 @@ ECDSA_SIG* eccx08_ecdsa_do_sign_sig(const unsigned char *dgst, int dgst_len,
         return NULL;
     }
 
-    if (eccx08_eckey_isx08key(eckey) != ENGINE_OPENSSL_SUCCESS)
+    if (eccx08_eckey_isx08key(eckey, &passwd_id) != ENGINE_OPENSSL_SUCCESS)
     {
         DEBUG_ENGINE("bad ATECC ECDSA key object\n");
         return NULL;
@@ -115,6 +116,19 @@ ECDSA_SIG* eccx08_ecdsa_do_sign_sig(const unsigned char *dgst, int dgst_len,
             break;
         }
         DEBUG_ENGINE("Got ATECC\n");
+
+        /* authorize if required */
+        if (passwd_id != NOPASSWD_ID) {
+            eccx08_engine_key_password_t *password = eccx08_get_password(passwd_id);
+            status = eccx08_auth_password(password);
+            if (status != ATCA_SUCCESS) {
+                DEBUG_ENGINE("ATECC auth failed\n");
+                if (ATCA_SUCCESS != atcab_release_safe()) {
+                    DEBUG_ENGINE("Failed to release, result 0x%x\n", status);
+                }
+                break;
+            }
+        }
 
         /* Do the actual signature using the configured slot */
         status = atcab_sign(slot_num, dgst, raw_sig);
@@ -327,7 +341,7 @@ ECDSA_SIG* eccx08_ecdsa_sign_sig(const unsigned char *dgst, int dgst_len,
     EC_KEY *eckey)
 {
     /* Check if the provided key is a hardware key */
-    if (eccx08_eckey_isx08key(eckey))
+    if (eccx08_eckey_isx08key(eckey, NULL))
     {
 #if ATCA_OPENSSL_OLD_API
         return eccx08_ecdsa_do_sign(dgst, dgst_len, inv, rp, eckey);

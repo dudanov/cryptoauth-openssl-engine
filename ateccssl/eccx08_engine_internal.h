@@ -174,8 +174,17 @@ typedef struct _eccx08_engine_key
     uint8_t     bus_num;
     uint8_t     device_num;
     uint8_t     slot_num;
-    uint8_t     reserved[20];
+    uint8_t     password_id;
+    uint8_t     reserved[19];
 } eccx08_engine_key_t;
+
+/** \brief Key password configuration */
+#define MAX_PASSWD_LEN 256
+typedef struct _eccx08_engine_key_password
+{
+    uint16_t auth_slot;
+    char password[MAX_PASSWD_LEN + 2];
+} eccx08_engine_key_password_t;
 
 /* Global Engine Structures */
 extern const ENGINE_CMD_DEFN eccx08_cmd_defns[];
@@ -228,8 +237,8 @@ int eccx08_sha256_selector(ENGINE *, const EVP_MD **, const int **, int );
 EVP_PKEY* eccx08_load_pubkey(ENGINE *, const char *, UI_METHOD *, void *);
 EVP_PKEY* eccx08_load_privkey(ENGINE *, const char *, UI_METHOD *, void *);
 int eccx08_pmeth_selector(ENGINE *, EVP_PKEY_METHOD **, const int **, int);
-int eccx08_eckey_isx08key(EC_KEY * ec);
-int eccx08_pkey_isx08key(EVP_PKEY * pkey);
+int eccx08_eckey_isx08key(EC_KEY * ec, uint8_t *passwd_id);
+int eccx08_pkey_isx08key(EVP_PKEY * pkey, uint8_t *passwd_id);
 
 /* ECDSA */
 ECDSA_SIG* eccx08_ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
@@ -246,6 +255,14 @@ const EC_KEY_METHOD *eccx08_ec_default_method(void);
 ATCA_STATUS atcab_init_from_privkey_safe(const EC_KEY *key, uint8_t *slot_num);
 
 ENGINE *eccx08_engine(void);
+
+ATCA_STATUS eccx08_auth_password(const eccx08_engine_key_password_t *password);
+int eccx08_cbdata_to_password(void *callback_data, eccx08_engine_key_password_t *password);
+
+#define NOPASSWD_ID 255
+eccx08_engine_key_password_t *eccx08_get_password(uint8_t id);
+uint8_t eccx08_make_password(void);
+void eccx08_release_password(void);
 
 #endif /* __ECCX08_ENGINE_INTERNAL_H__ */
 

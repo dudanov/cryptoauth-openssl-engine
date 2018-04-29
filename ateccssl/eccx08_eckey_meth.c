@@ -130,7 +130,7 @@ int eccx08_eckey_init(eccx08_engine_key_t * cfg)
     }
 }
 
-int eccx08_eckey_string_to_struct(eccx08_engine_key_t * out, const char* in)
+int eccx08_eckey_string_to_struct(eccx08_engine_key_t * out, const char* in, uint8_t passwd_id)
 {
     if (!out || !in)
     {
@@ -142,6 +142,7 @@ int eccx08_eckey_string_to_struct(eccx08_engine_key_t * out, const char* in)
     if (4 == sscanf(in, "ATECCx08:%02hhx:%02hhx:%02hhx:%02hhx", &out->bus_type,
         &out->bus_num, &out->device_num, &out->slot_num))
     {
+        out->password_id = passwd_id;
         return ENGINE_OPENSSL_SUCCESS;
     }
     else
@@ -151,7 +152,7 @@ int eccx08_eckey_string_to_struct(eccx08_engine_key_t * out, const char* in)
 }
 
 /** \brief Allocate and initialize a new ECKEY  */
-static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
+static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id, uint8_t passwd_id)
 {
     int ret = ENGINE_OPENSSL_FAILURE;
     EVP_PKEY *  pkey;
@@ -173,7 +174,7 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
 
         if (key_id)
         {
-            if (!eccx08_eckey_string_to_struct(&key_info, key_id))
+            if (!eccx08_eckey_string_to_struct(&key_info, key_id, passwd_id))
             {
                 break;
             }
@@ -272,7 +273,7 @@ static EVP_PKEY* eccx08_eckey_new_key(ENGINE *e, const char* key_id)
 
 /** \brief Check if the eckey provided is one that has been created by/for
 the engine */
-int eccx08_eckey_isx08key(EC_KEY * ec)
+int eccx08_eckey_isx08key(EC_KEY * ec, uint8_t *passwd_id)
 {
     int ret = ENGINE_OPENSSL_FAILURE;
     const BIGNUM* bn = EC_KEY_get0_private_key(ec);
@@ -298,6 +299,10 @@ int eccx08_eckey_isx08key(EC_KEY * ec)
 
         if (buf_ok && !memcmp(buf, "ATECCx08", 8))
         {
+            if (passwd_id != NULL) {
+                eccx08_engine_key_t *keyinfo = (eccx08_engine_key_t *) buf;
+                *passwd_id = keyinfo->password_id;
+            }
             ret = ENGINE_OPENSSL_SUCCESS;
         }
     }
@@ -306,7 +311,7 @@ int eccx08_eckey_isx08key(EC_KEY * ec)
 
 /** \brief Check if the pkey provided is one that has been created by/for
 the engine */
-int eccx08_pkey_isx08key(EVP_PKEY * pkey)
+int eccx08_pkey_isx08key(EVP_PKEY * pkey, uint8_t *passwd_id)
 {
     int ret = ENGINE_OPENSSL_FAILURE;
 
@@ -315,7 +320,7 @@ int eccx08_pkey_isx08key(EVP_PKEY * pkey)
         EC_KEY * ec_key = EVP_PKEY_get1_EC_KEY(pkey);
         if (ec_key)
         {
-            ret = eccx08_eckey_isx08key(ec_key);
+            ret = eccx08_eckey_isx08key(ec_key, passwd_id);
             EC_KEY_free(ec_key);
         }
     }
@@ -471,10 +476,11 @@ static int eccx08_eckey_convert(EC_KEY *pEcKey, uint8_t *pPubKeyRaw, size_t pubk
  * \param[in] ui_method - a pointer to the UI_METHOD structure
  *       (not used by the ateccx08 engine)
  * \param[in] callback_data - an optional parameter to provide
- *       the callback data (not used by the ateccx08 engine)
+ *       the callback data (used to provide passwords for example)
  * \return EVP_PKEY for success, NULL otherwise
  */
-static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, const char* key_id)
+static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, const char* key_id,
+            uint8_t passwd_id)
 {
     ATCA_STATUS     status = ATCA_GEN_FAIL;
     EC_KEY *        eckey = NULL;
@@ -482,7 +488,7 @@ static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, const c
     DEBUG_ENGINE("Entered\n");
     if (!pkey)
     {
-        pkey = eccx08_eckey_new_key(e, key_id);
+        pkey = eccx08_eckey_new_key(e, key_id, passwd_id);
         if (!pkey)
         {
             DEBUG_ENGINE("Failed\n");
@@ -513,6 +519,19 @@ static EVP_PKEY* eccx08_load_pubkey_internal(ENGINE *e, EVP_PKEY * pkey, const c
             break;
         }
         DEBUG_ENGINE("Got ATECC\n");
+
+        /* Authorize if it is required */
+        if (passwd_id != NOPASSWD_ID) {
+            eccx08_engine_key_password_t *password = eccx08_get_password(passwd_id);
+            status = eccx08_auth_password(password);
+            if (status != ATCA_SUCCESS) {
+                DEBUG_ENGINE("ATECC auth failed\n");
+                if (ATCA_SUCCESS != atcab_release_safe()) {
+                    DEBUG_ENGINE("Failed to release, result 0x%x\n", status);
+                }
+                break;
+            }
+        }
 
         /* Get public key without private key generation */
         status = atcab_get_pubkey(slot_num, &raw_pubkey[1]);
@@ -574,7 +593,16 @@ EVP_PKEY* eccx08_load_pubkey(ENGINE *e, const char *key_id,
     UI_METHOD *ui_method, void *callback_data)
 {
     DEBUG_ENGINE("Entered\n");
-    return eccx08_load_pubkey_internal(e, NULL, key_id);
+    eccx08_engine_key_password_t tmp_passwd;
+
+    if (eccx08_cbdata_to_password(callback_data, &tmp_passwd)) {
+        uint8_t passwd_id = eccx08_make_password();
+        eccx08_engine_key_password_t *passwd = eccx08_get_password(passwd_id);
+        memcpy(passwd, &tmp_passwd, sizeof (tmp_passwd));
+        return eccx08_load_pubkey_internal(e, NULL, key_id, passwd_id);
+    } else {
+        return eccx08_load_pubkey_internal(e, NULL, key_id, NOPASSWD_ID);
+    }
 }
 
 /** \brief Allocate an EVP_PKEY structure and initialize it
@@ -583,7 +611,16 @@ EVP_PKEY* eccx08_load_privkey(ENGINE *e, const char *key_id,
     UI_METHOD *ui_method, void *callback_data)
 {
     DEBUG_ENGINE("Entered\n");
-    return eccx08_load_pubkey_internal(e, NULL, key_id);
+
+    eccx08_engine_key_password_t tmp_passwd;
+    if (eccx08_cbdata_to_password(callback_data, &tmp_passwd)) {
+        uint8_t passwd_id = eccx08_make_password();
+        eccx08_engine_key_password_t *passwd = eccx08_get_password(passwd_id);
+        memcpy(passwd, &tmp_passwd, sizeof (tmp_passwd));
+        return eccx08_load_pubkey_internal(e, NULL, key_id, passwd_id);
+    } else {
+        return eccx08_load_pubkey_internal(e, NULL, key_id, NOPASSWD_ID);
+    }
 }
 
 
@@ -597,13 +634,14 @@ int eccx08_pkey_ec_init(EVP_PKEY_CTX *ctx)
     {
         /* Check if the key is actually meta data pertaining to an ATECCx08
             device configuration */
-        if (eccx08_pkey_isx08key(EVP_PKEY_CTX_get0_pkey(ctx)))
+        uint8_t passwd_id = NOPASSWD_ID;
+        if (eccx08_pkey_isx08key(EVP_PKEY_CTX_get0_pkey(ctx), &passwd_id))
         {
             /* Load the public key from the device - OpenSSL would have already
             checked the key against a cert if it was asked to use the cert so
             this may be redundant depending on the use */
             if (!eccx08_load_pubkey_internal(eccx08_engine(),
-                EVP_PKEY_CTX_get0_pkey(ctx), NULL))
+                EVP_PKEY_CTX_get0_pkey(ctx), NULL, passwd_id))
             {
                 return ENGINE_OPENSSL_FAILURE;
             }
