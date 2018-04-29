@@ -1,3 +1,9 @@
+libateccssl (0.2) stable; urgency=medium
+
+  * add password authentication for private keys
+
+ -- Nikita Maslov <n.maslov@contactless.ru>  Sun, 29 Apr 2018 03:06:38 +0300
+
 libateccssl (0.1) unstable; urgency=medium
 
   * Initial release. (Closes: #XXXXXX)
