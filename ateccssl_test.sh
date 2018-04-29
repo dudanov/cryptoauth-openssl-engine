@@ -13,8 +13,9 @@ die() {
     exit 1
 }
 
-ATECC_KEY=${ATECC_KEY:-"ATECCx08:00:09:c0:01"}
-ATECC_KEY_ROOT=${ATECC_KEY:-"ATECCx08:00:09:c0:02"}
+ATECC_KEY=${ATECC_KEY:-"ATECCx08:00:09:c0:00"}
+ATECC_KEY_ROOT=${ATECC_KEY_ROOT:-"ATECCx08:00:09:c0:00"}
+ATECC_PASSWD=${ATECC_PASSWD:-"1:password"}
 OPENSSL=${OPENSSL:-"openssl"}
 
 OPENSSL_NEW_API=0
@@ -66,8 +67,8 @@ info "Test file signing..."
 FILE_TO_SIGN=$0
 
 {
-    openssl dgst -engine .build/libateccssl.so -keyform ENGINE -sha256 -sign $ATECC_KEY -out $FILE_TO_SIGN.sign $FILE_TO_SIGN &&
-    openssl dgst -engine .build/libateccssl.so -keyform ENGINE -sha256 -verify $ATECC_KEY -signature $FILE_TO_SIGN.sign $FILE_TO_SIGN
+    openssl dgst -engine .build/libateccssl.so -keyform ENGINE -sha256 -sign $ATECC_KEY -passin pass:$ATECC_PASSWD -out $FILE_TO_SIGN.sign $FILE_TO_SIGN &&
+    openssl dgst -engine .build/libateccssl.so -keyform ENGINE -sha256 -prverify $ATECC_KEY -passin pass:$ATECC_PASSWD -signature $FILE_TO_SIGN.sign $FILE_TO_SIGN
 } && {
     rm -f $FILE_TO_SIGN.sign
     info "-> Passed"
@@ -87,9 +88,9 @@ CRT_FILE=test.crt.pem
 
 {
     # make root certificate
-    echo -ne "\n\n\n\n\n\n\n" | openssl req -engine .build/libateccssl.so -keyform ENGINE -x509 -new -key $ATECC_KEY_ROOT -days 10000 -out $ROOT_FILE &&
-    echo -ne "\n\n\n\n\n\ntest\n\n\n" | openssl req -engine .build/libateccssl.so -keyform ENGINE -new -key $ATECC_KEY -out $CSR_FILE &&
-    openssl x509 -engine .build/libateccssl.so -CAkeyform ENGINE -req -in $CSR_FILE -CA $ROOT_FILE -CAkey $ATECC_KEY_ROOT -CAcreateserial -out $CRT_FILE -days 5000 &&
+    echo -ne "\n\n\n\n\n\n\n" | openssl req -engine .build/libateccssl.so -keyform ENGINE -x509 -new -key $ATECC_KEY_ROOT -passin pass:$ATECC_PASSWD -days 10000 -out $ROOT_FILE &&
+    echo -ne "\n\n\n\n\n\ntest\n\n\n" | openssl req -engine .build/libateccssl.so -keyform ENGINE -new -key $ATECC_KEY -passin pass:$ATECC_PASSWD -out $CSR_FILE &&
+    openssl x509 -engine .build/libateccssl.so -CAkeyform ENGINE -req -in $CSR_FILE -CA $ROOT_FILE -CAkey $ATECC_KEY_ROOT -passin pass:$ATECC_PASSWD -CAcreateserial -out $CRT_FILE -days 5000 &&
     openssl verify -verbose -CAfile $ROOT_FILE $CRT_FILE
 } && {
     rm -f $CSR_FILE $ROOT_FILE $CRT_FILE
