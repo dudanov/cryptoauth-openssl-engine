@@ -109,6 +109,10 @@ static ATCA_STATUS do_atecc_auth(const char *passwd, uint8_t slot_id)
 int eccx08_cbdata_to_password(void *callback_data, eccx08_engine_key_password_t *password)
 {
     /* try to dereference callback data as string */
+    /* assume callback_data == NULL as no pass */
+    if (callback_data == NULL)
+        return 0;
+
     const char *cb_pass = *((const char **) callback_data);
 
     if (cb_pass == NULL) {
