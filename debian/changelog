@@ -1,3 +1,10 @@
+libateccssl (0.2.2) stable; urgency=medium
+
+  * cryptoauthlib: add command result read retries
+    This fixes an error at crypto/asn1/a_sign.c:208 on some ATECC chips
+
+ -- Nikita Maslov <nikita.maslov@wirenboard.ru>  Fri, 18 Feb 2022 13:22:31 +0300
+
 libateccssl (0.2.1) stable; urgency=medium
 
   * Fix segfault when ENGINE_load_private_key called with NULL password
